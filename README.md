@@ -21,3 +21,21 @@ Eclipse Automation license (for write access on clinical systems)
 Visual Studio (to compile as a binary plugin)
 
 The script is heavily commented throughout and written to be readable by anyone learning ESAPI — each section explains what it does, why, and how to extend it.
+
+Licence & Disclaimer
+© 2025 David Neill. All rights reserved.
+This script is provided for educational and non-commercial use only. It was developed for internal use at [Your Hospital/Health Service] and is shared publicly to support learning within the radiation therapy and medical physics community.
+You are welcome to:
+
+Read, learn from, and adapt this code for your own non-commercial clinical or research use
+Share it with attribution
+
+You are not permitted to:
+
+Use this script or any derivative of it for commercial purposes
+Sell, license, or redistribute this script as part of a commercial product or service
+Remove or alter this notice
+
+Clinical Disclaimer:
+This script is provided as-is, without warranty of any kind. It has been tested in a specific clinical environment and may require modification for use at other sites. The authors of custom scripts are responsible for verifying the accuracy and correctness of their scripts (Varian SYRS350.75). Always test on a non-clinical system before deploying to a clinical environment. The author accepts no liability for any clinical, technical, or data consequences arising from the use of this script.
+This project is not affiliated with, endorsed by, or supported by Varian Medical Systems / Siemens Healthineers.
