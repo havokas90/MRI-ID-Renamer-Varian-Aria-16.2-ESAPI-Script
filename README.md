@@ -24,7 +24,7 @@ The script is heavily commented throughout and written to be readable by anyone 
 
 Licence & Disclaimer
 © 2025 David Neill. All rights reserved.
-This script is provided for educational and non-commercial use only. It was developed for internal use at [Your Hospital/Health Service] and is shared publicly to support learning within the radiation therapy and medical physics community.
+This script is provided for educational and non-commercial use only. It was developed for internal use at [Western Cancer Centre Dubbo and Centeral Western Cancer Center Orange, NSW.] and is shared publicly to support learning within the radiation therapy and medical physics community.
 You are welcome to:
 
 Read, learn from, and adapt this code for your own non-commercial clinical or research use
