@@ -1,9 +1,9 @@
-MRI ID Renamer — Varian Aria 16.2 ESAPI Script
-A write-enabled ESAPI plugin script for Varian Aria 16.2 that automates renaming of imported MRI image IDs in Eclipse.
+MRI and CT ID Renamer — Varian Aria 16.2 ESAPI Script
+A write-enabled ESAPI plugin script for Varian Aria 16.2 that automates renaming of imported MRI and CT  image IDs in Eclipse.
 When MRI studies are imported for fusion planning, images arrive with placeholder IDs like 1 or MRI_1. This script reads the existing series description and study description already stored in Aria and generates a meaningful, standardised image ID — without any manual typing.
 What it does:
 
-Scans all MRI series for the currently open patient
+Scans all MRI and CT series for the currently open patient
 Reads the series description (e.g. t2_tse_ax_p3_2.5mm) and strips slice thickness to save characters
 Reads the study description (e.g. Pelvis Prostate) to automatically append a body region suffix (_PEL, _HN, _CH, _AB, _BR, _SP, _EXT)
 Proposes new IDs within Aria's 16-character limit, truncating at word boundaries
