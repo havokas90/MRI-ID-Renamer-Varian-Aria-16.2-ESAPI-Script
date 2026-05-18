@@ -7,9 +7,9 @@
 //  they often arrive with placeholder image IDs (e.g. "1", "MRI_1").
 //  This script automatically renames those IDs to something
 //  meaningful using information already stored in the database:
-//    - series.Comment  — the series description from the scanner
+//    - series.Comment  - the series description from the scanner
 //                        e.g. "t2_tse_ax_p3_2.5mm"
-//    - study.Comment   — the study description set in Aria
+//    - study.Comment   - the study description set in Aria
 //                        e.g. "Pelvis Prostate"
 //
 //  RESULT EXAMPLES:
@@ -17,9 +17,9 @@
 //    MRI after  : T2_TSE_AX_PEL  CT after  : CT_PELVIS_PEL
 //
 //  MODALITIES HANDLED:
-//    MR — no prefix, description + body suffix
+//    MR - no prefix, description + body suffix
 //         e.g. T2_TSE_AX_P3_PEL
-//    CT — CT_ prefix, description + body suffix
+//    CT - CT_ prefix, description + body suffix
 //         e.g. CT_CHEST_CH
 //
 //  DUPLICATE ID HANDLING:
@@ -32,21 +32,21 @@
 //  SELECTIVE RENAMING:
 //  The preview window shows all found images with a checkbox
 //  per row. All are ticked by default. Untick any you want to
-//  skip — useful when a patient has existing named images from
+//  skip - useful when a patient has existing named images from
 //  a previous course and only the new ones need renaming.
 //
 //  CONFIRMED API USAGE (verified against Varian docs):
-//    series.Modality.ToString() — "MR", "CT" etc.
-//    series.Comment             — series description (read-only)
-//    series.Images              — IEnumerable<Image>
-//    study.Comment              — study description (read-only)
-//    image.Id                   — writeable, confirmed via community
-//    image.ZSize                — number of slices
-//    patient.BeginModifications() — required before any write
-//    .ToList()                  — required before iterating if modifying
+//    series.Modality.ToString() - "MR", "CT" etc.
+//    series.Comment             - series description (read-only)
+//    series.Images              - IEnumerable<Image>
+//    study.Comment              - study description (read-only)
+//    image.Id                   - attempted by reflection; may be read-only
+//    image.ZSize                - number of slices
+//    patient.BeginModifications() - required before any write
+//    .ToList()                  - required before iterating if modifying
 //
 //  COMPATIBILITY:
-//  No C# string interpolation ($"...") — compatible with the
+//  No C# string interpolation ($"...") - compatible with the
 //  older compiler used by some Aria 16.2 installations.
 // ================================================================
 
@@ -95,7 +95,7 @@ namespace VMS.TPS
 
             foreach (var study in studyList)
             {
-                // study.Comment is the Study Description in Aria —
+                // study.Comment is the Study Description in Aria -
                 // e.g. "Pelvis Prostate", "Head Neck".
                 // Used to determine the body region suffix.
                 string studyDesc = (study.Comment ?? "").Trim();
@@ -113,7 +113,7 @@ namespace VMS.TPS
                     if (modality != "MR" && modality != "CT")
                         continue;
 
-                    // series.Comment is the Series Description —
+                    // series.Comment is the Series Description -
                     // the scanner's description of the sequence.
                     string seriesDesc = (series.Comment ?? "").Trim();
 
@@ -159,7 +159,7 @@ namespace VMS.TPS
                 return;
             }
 
-            // ── Resolve duplicate proposed IDs ────────────────────────
+            // -- Resolve duplicate proposed IDs ------------------------
             // After building all proposed IDs, check for duplicates
             // across all items. If two items would get the same ID,
             // append a number to the second, third etc.
@@ -199,7 +199,7 @@ namespace VMS.TPS
             foreach (var group in groups)
             {
                 int counter = 2;
-                // Skip the first item — it keeps the original proposed ID.
+                // Skip the first item - it keeps the original proposed ID.
                 // Number the rest from 2 upward.
                 foreach (var item in group.Skip(1))
                 {
@@ -224,7 +224,7 @@ namespace VMS.TPS
         //  Reads the study description and returns a short body region
         //  suffix, or empty string if no keyword is matched.
         //
-        //  Checks are ordered deliberately — more specific terms are
+        //  Checks are ordered deliberately - more specific terms are
         //  checked before broader ones to avoid false matches:
         //    "Head Neck" before "Head" alone
         //    "Abdomen" before "Pelvis" (so "Abdomen Pelvis" gets _AB)
@@ -253,7 +253,7 @@ namespace VMS.TPS
             if (ContainsAny(upper, new[] { "CHEST", "THORAX", "THORACIC", "LUNG", "MEDIASTIN" }))
                 return "_CH";
 
-            // Abdomen before Pelvis — "Abdomen Pelvis" gets _AB
+            // Abdomen before Pelvis - "Abdomen Pelvis" gets _AB
             if (ContainsAny(upper, new[] { "ABDOMEN", "ABDOMINAL", "LIVER", "PANCREAS", "KIDNEY", "RENAL", "ADRENAL" }))
                 return "_AB";
 
@@ -305,7 +305,7 @@ namespace VMS.TPS
         //    produce "CT_CT_PEL_PEL". We detect this and skip the prefix.
         //
         //  STEPS:
-        //  1. Handle ep2d — extract last meaningful token
+        //  1. Handle ep2d - extract last meaningful token
         //  2. Strip mm thickness patterns (_2.5mm, _3mm etc.)
         //  3. Strip disallowed characters
         //  4. For CT, add "CT_" prefix only if not already present
@@ -373,7 +373,7 @@ namespace VMS.TPS
 
             // Step 4: Determine prefix for CT.
             // Only add "CT_" if the description doesn't already start
-            // with it — prevents "CT_CT_PEL_PEL" when the scanner has
+            // with it - prevents "CT_CT_PEL_PEL" when the scanner has
             // already included CT_ in the series description.
             string prefix = "";
             if (modality == "CT")
@@ -408,11 +408,11 @@ namespace VMS.TPS
                     descPart = clean.Substring(0, available);
             }
 
-            // Step 7: Assemble final ID — prefix + description + suffix,
+            // Step 7: Assemble final ID - prefix + description + suffix,
             // all uppercased with spaces converted to underscores.
             string result = prefix + Finalise(descPart) + suffix;
 
-            // Safety trim — should not normally be needed
+            // Safety trim - should not normally be needed
             if (result.Length > 16)
                 result = result.Substring(0, 16);
 
@@ -428,13 +428,13 @@ namespace VMS.TPS
     // ================================================================
     //  RenameItem
     //  Data container for one rename operation.
-    //  Selected defaults to true — all ticked in the preview.
+    //  Selected defaults to true - all ticked in the preview.
     //  Modality stored so the UI can colour-code MR vs CT rows.
     // ================================================================
     public class RenameItem
     {
         public VMS.TPS.Common.Model.API.Image Image      { get; set; }
-        public Series Series     { get; set; }  // stored so we can attempt series.Id rename
+        public Series Series     { get; set; }  // source series; Series.Id is read-only in ESAPI
         public string CurrentId  { get; set; }
         public string SeriesDesc { get; set; }
         public string StudyDesc  { get; set; }
@@ -473,7 +473,7 @@ namespace VMS.TPS
 
         private void BuildUI()
         {
-            Title                 = "Image ID Renamer — " + _patient.Id;
+            Title                 = "Image ID Renamer - " + _patient.Id;
             Width                 = 780;
             SizeToContent         = SizeToContent.Height;
             ResizeMode            = ResizeMode.NoResize;
@@ -489,7 +489,7 @@ namespace VMS.TPS
                 size: 11, gray: true));
             root.Children.Add(Gap(10));
 
-            // ── Colour key ────────────────────────────────────────────
+            // -- Colour key --------------------------------------------
             var keyPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -501,7 +501,7 @@ namespace VMS.TPS
             keyPanel.Children.Add(MakeLabel(" CT", size: 11));
             root.Children.Add(keyPanel);
 
-            // ── Column headers ────────────────────────────────────────
+            // -- Column headers ----------------------------------------
             var headers = new Grid { Margin = new Thickness(0, 0, 0, 2) };
             headers.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });  // checkbox
             headers.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });  // modality badge
@@ -529,7 +529,7 @@ namespace VMS.TPS
             AddToGrid(headers, MakeLabel("Series  |  Study", bold: true, size: 11),   6);
             root.Children.Add(headers);
 
-            // ── Scrollable list ───────────────────────────────────────
+            // -- Scrollable list ---------------------------------------
             var listBorder = new Border
             {
                 BorderBrush     = new SolidColorBrush(Colors.LightGray),
@@ -543,7 +543,7 @@ namespace VMS.TPS
             {
                 var capturedItem = item;
 
-                // Row background — blue tint for MRI, orange tint for CT
+                // Row background - blue tint for MRI, orange tint for CT
                 bool isMR = item.Modality == "MR";
                 var rowBg = new SolidColorBrush(
                     isMR ? Color.FromRgb(220, 235, 252)   // light blue
@@ -575,7 +575,7 @@ namespace VMS.TPS
                 _rowCheckBoxes.Add(cb);
                 AddToGrid(row, cb, 0);
 
-                // Modality badge — MR or CT label
+                // Modality badge - MR or CT label
                 AddToGrid(row, new TextBlock
                 {
                     Text                = item.Modality,
@@ -608,7 +608,7 @@ namespace VMS.TPS
                     FontSize            = 11
                 }, 3);
 
-                // Proposed new ID — green and bold
+                // Proposed new ID - green and bold
                 AddToGrid(row, new TextBlock
                 {
                     Text              = item.ProposedId,
@@ -620,7 +620,7 @@ namespace VMS.TPS
                     Margin            = new Thickness(2, 0, 0, 0)
                 }, 4);
 
-                // Suffix — blue if matched, grey if none
+                // Suffix - blue if matched, grey if none
                 AddToGrid(row, new TextBlock
                 {
                     Text              = string.IsNullOrEmpty(item.Suffix) ? "none" : item.Suffix,
@@ -697,7 +697,7 @@ namespace VMS.TPS
             Content = root;
         }
 
-        // ── SelectAll / per-row checkbox logic ───────────────────────
+        // -- SelectAll / per-row checkbox logic -----------------------
 
         private void OnSelectAllChanged(object sender, RoutedEventArgs e)
         {
@@ -723,7 +723,7 @@ namespace VMS.TPS
             else if (selectedCount == 0)
                 _selectAllBox.IsChecked = false;
             else
-                _selectAllBox.IsChecked = null; // indeterminate — some selected
+                _selectAllBox.IsChecked = null; // indeterminate - some selected
             _updatingSelectAll = false;
         }
 
@@ -770,18 +770,12 @@ namespace VMS.TPS
                 {
                     try
                     {
-                        // Set the new image ID.
-                        // image.Id is confirmed writeable: public string Id { get; set; }
-                        item.Image.Id = item.ProposedId;
-
-                        // Attempt to also set the series ID.
-                        // series.Id shows as { get; } in the 16.1 CHM docs, but
-                        // the CHM may be out of date — Aria 16.2 may have added
-                        // a setter. We try it silently: if it works, great; if
-                        // it throws a property-is-read-only exception we just
-                        // swallow it and carry on. The image rename still succeeds.
-                        try { item.Series.Id = item.ProposedId; }
-                        catch { /* series.Id read-only on this version — ignore */ }
+                        // Set the new image ID using reflection instead of
+                        // direct assignment. On some ESAPI installs Image.Id
+                        // is inherited from ApiDataObject.Id and has no public
+                        // setter, so direct code like item.Image.Id = ... causes
+                        // compile error CS0200 before the script can even run.
+                        TrySetImageId(item.Image, item.ProposedId);
 
                         ok++;
                     }
@@ -816,7 +810,20 @@ namespace VMS.TPS
             _applyBtn.Click    += (s, ev) => Close();
         }
 
-        // ── Helpers ───────────────────────────────────────────────────
+        private static void TrySetImageId(VMS.TPS.Common.Model.API.Image image, string proposedId)
+        {
+            var idProperty = image.GetType().GetProperty("Id");
+            if (idProperty == null || idProperty.GetSetMethod() == null)
+            {
+                throw new InvalidOperationException(
+                    "This ESAPI installation exposes Image.Id as read-only. " +
+                    "The script can preview suggested IDs, but Eclipse/ARIA will not allow this script to rename image IDs directly.");
+            }
+
+            idProperty.SetValue(image, proposedId, null);
+        }
+
+        // -- Helpers ---------------------------------------------------
 
         private void SetStatus(string msg, bool red)
         {

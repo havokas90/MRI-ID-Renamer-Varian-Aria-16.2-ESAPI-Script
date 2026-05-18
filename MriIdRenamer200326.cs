@@ -731,9 +731,10 @@ namespace VMS.TPS
                     try
                     {
                         // THE ACTUAL RENAME:
-                        // image.Id is the writeable property confirmed
-                        // by the ESAPI community for renaming MRI images.
-                        item.Image.Id = item.ProposedId;
+                        // Use reflection so this script still compiles on
+                        // ESAPI installs where Image.Id is exposed as read-only
+                        // at compile time.
+                        TrySetImageId(item.Image, item.ProposedId);
                         ok++;
                     }
                     catch (Exception ex)
@@ -774,6 +775,19 @@ namespace VMS.TPS
         }
 
         // ── Helper methods ────────────────────────────────────────────
+
+        private static void TrySetImageId(VMS.TPS.Common.Model.API.Image image, string proposedId)
+        {
+            var idProperty = image.GetType().GetProperty("Id");
+            if (idProperty == null || idProperty.GetSetMethod() == null)
+            {
+                throw new InvalidOperationException(
+                    "This ESAPI installation exposes Image.Id as read-only. " +
+                    "The script can preview suggested IDs, but Eclipse/ARIA will not allow this script to rename image IDs directly.");
+            }
+
+            idProperty.SetValue(image, proposedId, null);
+        }
 
         private void SetStatus(string msg, bool red)
         {
