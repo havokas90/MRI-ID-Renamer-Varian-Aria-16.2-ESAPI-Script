@@ -23,11 +23,16 @@ namespace EclipseImageRenamer.LocalPreview
                 Candidate("MR", "MR3", "T1_POST_HN", "_HN", "t1 post contrast", "Head and Neck MRI"),
                 Candidate("CT", "CT1", "CT_SIM_PEL", "_PEL", "CT SIM 2.5mm", "Pelvis planning CT"),
                 Candidate("CT", "CT2", "CT_CHEST_CH", "_CH", "4D CT chest", "Thorax 4DCT"),
-                Candidate("MR", "OLD_LONG_NAME", "T2_SPACE_BRAIN_BR", "_BR", "T2 SPACE brain 1.0mm", "Brain MRI")
+                Candidate("MR", "OLD_LONG_NAME", "T2_SPACE_BRAIN_BR", "_BR", "T2 SPACE brain 1.0mm", "Brain MRI"),
+                Candidate("MR", "UNCHANGED_BR", "UNCHANGED_BR", "_BR", "Already correct image ID", "Brain MRI"),
+                Candidate("CT", "EXISTING_PEL", "EXISTING_PEL", "_PEL", "Existing pelvis image kept for duplicate testing", "Pelvis planning CT", false),
+                Candidate("CT", "CT_DUP_TEST", "EXISTING_PEL", "_PEL", "Edited ID collides with an existing patient image", "Pelvis planning CT"),
+                Candidate("MR", "MR_LONG", "VERY_LONG_BRAIN_NAME_THAT_WILL_TRUNCATE", "_BR", "Very long scanner description example", "Brain MRI"),
+                Candidate("MR", "MR_SYMBOLS", "BAD NAME!*", "_BR", "Edited ID with spaces and symbols", "Brain MRI")
             };
         }
 
-        private static RenameCandidate Candidate(string modality, string currentId, string newId, string suffix, string series, string study)
+        private static RenameCandidate Candidate(string modality, string currentId, string newId, string suffix, string series, string study, bool selected = true)
         {
             return new RenameCandidate
             {
@@ -37,7 +42,7 @@ namespace EclipseImageRenamer.LocalPreview
                 Suffix = suffix,
                 SeriesDescription = series,
                 StudyDescription = study,
-                IsSelected = true
+                IsSelected = selected
             };
         }
     }

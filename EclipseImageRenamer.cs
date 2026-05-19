@@ -422,6 +422,7 @@ namespace VMS.TPS
         public bool IsSelected { get; set; }
         public CheckBox RowCheckBox { get; set; }
         public TextBox NewIdTextBox { get; set; }
+        public Border RowBorder { get; set; }
     }
 
     /// <summary>
@@ -434,6 +435,7 @@ namespace VMS.TPS
         private readonly Patient _patient;
         private readonly ObservableCollection<RenameCandidate> _candidates;
         private readonly bool _previewOnly;
+        private readonly Dictionary<string, int> _patientIdCounts;
 
         private CheckBox _selectAllCheckBox;
         private Button _applyButton;
@@ -443,6 +445,8 @@ namespace VMS.TPS
         private TextBlock _countLabel;
 
         private bool _isUpdatingSelectAll;
+        private bool _isNormalizingText;
+        private bool _isApplying;
         private bool _isFinished;
 
         private readonly Brush _mrRowBrush = new SolidColorBrush(Color.FromRgb(232, 243, 252));
@@ -453,6 +457,8 @@ namespace VMS.TPS
         private readonly Brush _suffixBrush = new SolidColorBrush(Color.FromRgb(37, 99, 235));
         private readonly Brush _mutedBrush = new SolidColorBrush(Color.FromRgb(130, 130, 130));
         private readonly Brush _errorBrush = new SolidColorBrush(Color.FromRgb(185, 28, 28));
+        private readonly Brush _warningBrush = new SolidColorBrush(Color.FromRgb(180, 83, 9));
+        private readonly Brush _defaultTextBoxBorderBrush = new SolidColorBrush(Color.FromRgb(171, 173, 179));
 
         public EclipseImageRenamerWindow(Patient patient, List<RenameCandidate> candidates)
             : this(patient, candidates, false)
@@ -469,6 +475,7 @@ namespace VMS.TPS
             _patient = patient;
             _candidates = new ObservableCollection<RenameCandidate>(candidates);
             _previewOnly = previewOnly;
+            _patientIdCounts = BuildPatientIdCounts(patient, candidates);
 
             Title = previewOnly ? "Eclipse Image Renamer Local Preview" : "Eclipse Image Renamer";
             Width = 1380;
@@ -526,6 +533,7 @@ namespace VMS.TPS
                 rowBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(235, 235, 235));
                 rowBorder.BorderThickness = new Thickness(1, 0, 1, 1);
                 rowBorder.Padding = new Thickness(6, 5, 6, 5);
+                candidate.RowBorder = rowBorder;
                 rowBorder.Child = BuildGridRow(false, candidate);
                 listContainer.Children.Add(rowBorder);
             }
@@ -785,6 +793,11 @@ namespace VMS.TPS
 
         private void NewIdTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
+            if (_isNormalizingText)
+            {
+                return;
+            }
+
             TextBox box = sender as TextBox;
             if (box == null)
             {
@@ -797,7 +810,18 @@ namespace VMS.TPS
                 return;
             }
 
-            candidate.NewId = box.Text;
+            string normalized = NormalizeEditedId(box.Text);
+            if (box.Text != normalized)
+            {
+                int caretIndex = box.CaretIndex;
+                _isNormalizingText = true;
+                box.Text = normalized;
+                box.CaretIndex = Math.Min(caretIndex, box.Text.Length);
+                _isNormalizingText = false;
+            }
+
+            candidate.NewId = normalized;
+            UpdateSelectionSummary();
         }
 
         private void RowCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -848,6 +872,10 @@ namespace VMS.TPS
             // This method is the single source of truth for selection-dependent UI:
             // it updates the Apply button label and drives the Select All tri-state.
             int selectedCount = _candidates.Count(c => c.IsSelected);
+            int changedCount;
+            string validationMessage;
+            bool isValid = ValidateSelectionState(true, out validationMessage, out changedCount);
+
             if (_previewOnly)
             {
                 _applyButton.Content = "Close Preview";
@@ -855,8 +883,37 @@ namespace VMS.TPS
             }
             else
             {
-                _applyButton.Content = _isFinished ? "Close" : "Apply (" + selectedCount.ToString(CultureInfo.InvariantCulture) + " selected)";
-                _applyButton.IsEnabled = _isFinished || selectedCount > 0;
+                _applyButton.Content = _isFinished
+                    ? "Close"
+                    : "Apply (" + changedCount.ToString(CultureInfo.InvariantCulture) + " changed)";
+                _applyButton.IsEnabled = _isFinished || (changedCount > 0 && isValid);
+            }
+
+            if (!_isApplying && !_isFinished && _statusText != null)
+            {
+                if (!isValid)
+                {
+                    _statusText.Text = validationMessage;
+                    _statusText.Foreground = _errorBrush;
+                }
+                else if (selectedCount > changedCount)
+                {
+                    _statusText.Text = changedCount.ToString(CultureInfo.InvariantCulture) +
+                                       " selected image ID(s) will change. " +
+                                       (selectedCount - changedCount).ToString(CultureInfo.InvariantCulture) +
+                                       " unchanged selected row(s) will be skipped.";
+                    _statusText.Foreground = _warningBrush;
+                }
+                else if (_previewOnly)
+                {
+                    _statusText.Text = "Local preview mode. No ESAPI patient is open and no image IDs will be written.";
+                    _statusText.Foreground = _mutedBrush;
+                }
+                else
+                {
+                    _statusText.Text = selectedCount.ToString(CultureInfo.InvariantCulture) + " selected image ID(s) will change.";
+                    _statusText.Foreground = _mutedBrush;
+                }
             }
 
             _isUpdatingSelectAll = true;
@@ -903,54 +960,47 @@ namespace VMS.TPS
                 return;
             }
 
+            int changedCount;
+            string validationMessage;
+            if (!ValidateSelectionState(true, out validationMessage, out changedCount))
+            {
+                _statusText.Text = validationMessage;
+                _statusText.Foreground = _errorBrush;
+                return;
+            }
+
+            List<RenameCandidate> toWrite = selected
+                .Where(c => !IdsEqual(c.CurrentId, c.NewId))
+                .ToList();
+
+            if (toWrite.Count == 0)
+            {
+                _statusText.Text = "No image IDs changed. Unchanged selected rows were skipped.";
+                _statusText.Foreground = _warningBrush;
+                UpdateSelectionSummary();
+                return;
+            }
+
+            if (!ConfirmApply(toWrite))
+            {
+                _statusText.Text = "Apply cancelled. No image IDs were changed.";
+                _statusText.Foreground = _mutedBrush;
+                UpdateSelectionSummary();
+                return;
+            }
+
+            _isApplying = true;
             _progressBar.Visibility = Visibility.Visible;
             _progressBar.Minimum = 0;
-            _progressBar.Maximum = selected.Count;
+            _progressBar.Maximum = toWrite.Count;
             _progressBar.Value = 0;
             _statusText.Text = "Applying image ID updates...";
             _statusText.Foreground = _mutedBrush;
 
-            _applyButton.IsEnabled = false;
-            _selectAllCheckBox.IsEnabled = false;
-            foreach (RenameCandidate candidate in _candidates)
-            {
-                if (candidate.RowCheckBox != null)
-                {
-                    candidate.RowCheckBox.IsEnabled = false;
-                }
-
-                if (candidate.NewIdTextBox != null)
-                {
-                    candidate.NewIdTextBox.IsEnabled = false;
-                }
-            }
+            SetEditingEnabled(false);
 
             int successCount = 0;
             List<string> errors = new List<string>();
-
-            string validationMessage;
-            if (!ValidateSelectedIds(selected, out validationMessage))
-            {
-                _statusText.Text = validationMessage;
-                _statusText.Foreground = _errorBrush;
-                _applyButton.IsEnabled = true;
-                _selectAllCheckBox.IsEnabled = true;
-                _progressBar.Visibility = Visibility.Collapsed;
-                foreach (RenameCandidate candidate in _candidates)
-                {
-                    if (candidate.RowCheckBox != null)
-                    {
-                        candidate.RowCheckBox.IsEnabled = true;
-                    }
-
-                    if (candidate.NewIdTextBox != null)
-                    {
-                        candidate.NewIdTextBox.IsEnabled = true;
-                    }
-                }
-
-                return;
-            }
 
             try
             {
@@ -959,9 +1009,9 @@ namespace VMS.TPS
                 // in its own try/catch so one bad image does not stop the batch.
                 _patient.BeginModifications();
 
-                for (int i = 0; i < selected.Count; i++)
+                for (int i = 0; i < toWrite.Count; i++)
                 {
-                    RenameCandidate candidate = selected[i];
+                    RenameCandidate candidate = toWrite[i];
 
                     try
                     {
@@ -985,6 +1035,12 @@ namespace VMS.TPS
             StringBuilder builder = new StringBuilder();
             builder.Append(successCount.ToString(CultureInfo.InvariantCulture));
             builder.Append(" image(s) renamed.");
+            if (selected.Count > toWrite.Count)
+            {
+                builder.Append(" ");
+                builder.Append((selected.Count - toWrite.Count).ToString(CultureInfo.InvariantCulture));
+                builder.Append(" unchanged selected row(s) skipped.");
+            }
 
             if (errors.Count > 0)
             {
@@ -1000,6 +1056,7 @@ namespace VMS.TPS
             }
 
             _statusText.Text = builder.ToString();
+            _isApplying = false;
             _isFinished = true;
             UpdateSelectionSummary();
         }
@@ -1011,10 +1068,67 @@ namespace VMS.TPS
             return currentId + " -> " + proposedId + " failed: " + ex.Message;
         }
 
-        private static bool ValidateSelectedIds(List<RenameCandidate> selected, out string message)
+        private void SetEditingEnabled(bool isEnabled)
         {
+            _applyButton.IsEnabled = isEnabled;
+            _selectAllCheckBox.IsEnabled = isEnabled;
+
+            foreach (RenameCandidate candidate in _candidates)
+            {
+                if (candidate.RowCheckBox != null)
+                {
+                    candidate.RowCheckBox.IsEnabled = isEnabled;
+                }
+
+                if (candidate.NewIdTextBox != null)
+                {
+                    candidate.NewIdTextBox.IsEnabled = isEnabled;
+                }
+            }
+        }
+
+        private bool ConfirmApply(List<RenameCandidate> toWrite)
+        {
+            StringBuilder builder = new StringBuilder();
+            builder.Append("You are about to rename ");
+            builder.Append(toWrite.Count.ToString(CultureInfo.InvariantCulture));
+            builder.Append(" image ID(s).");
+
+            int previewCount = Math.Min(8, toWrite.Count);
+            for (int i = 0; i < previewCount; i++)
+            {
+                builder.Append(Environment.NewLine);
+                builder.Append(SafeText(toWrite[i].CurrentId));
+                builder.Append(" -> ");
+                builder.Append(SafeText(toWrite[i].NewId));
+            }
+
+            if (toWrite.Count > previewCount)
+            {
+                builder.Append(Environment.NewLine);
+                builder.Append("...");
+            }
+
+            builder.Append(Environment.NewLine);
+            builder.Append(Environment.NewLine);
+            builder.Append("Continue?");
+
+            return MessageBox.Show(
+                       builder.ToString(),
+                       "Confirm Eclipse Image Renamer changes",
+                       MessageBoxButton.YesNo,
+                       MessageBoxImage.Warning) == MessageBoxResult.Yes;
+        }
+
+        private bool ValidateSelectionState(bool updateUi, out string message, out int changedCount)
+        {
+            changedCount = 0;
             List<string> errors = new List<string>();
             Dictionary<string, int> proposedCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, List<RenameCandidate>> proposedRows = new Dictionary<string, List<RenameCandidate>>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<RenameCandidate, string> rowErrors = new Dictionary<RenameCandidate, string>();
+            List<RenameCandidate> selected = _candidates.Where(c => c.IsSelected).ToList();
+            Dictionary<string, int> remainingPatientIds = new Dictionary<string, int>(_patientIdCounts, StringComparer.OrdinalIgnoreCase);
 
             foreach (RenameCandidate candidate in selected)
             {
@@ -1024,18 +1138,38 @@ namespace VMS.TPS
 
                 if (candidate.NewIdTextBox != null && candidate.NewIdTextBox.Text != normalized)
                 {
+                    _isNormalizingText = true;
                     candidate.NewIdTextBox.Text = normalized;
+                    candidate.NewIdTextBox.CaretIndex = candidate.NewIdTextBox.Text.Length;
+                    _isNormalizingText = false;
                 }
 
                 if (string.IsNullOrEmpty(normalized))
                 {
                     errors.Add(SafeText(candidate.CurrentId) + " has a blank New ID.");
+                    rowErrors[candidate] = "New ID cannot be blank.";
                     continue;
                 }
+
+                if (IdsEqual(candidate.CurrentId, normalized))
+                {
+                    continue;
+                }
+
+                changedCount = changedCount + 1;
+                AdjustValidationCount(remainingPatientIds, candidate.CurrentId, -1);
 
                 int existing;
                 proposedCounts.TryGetValue(normalized, out existing);
                 proposedCounts[normalized] = existing + 1;
+
+                List<RenameCandidate> rows;
+                if (!proposedRows.TryGetValue(normalized, out rows))
+                {
+                    rows = new List<RenameCandidate>();
+                    proposedRows[normalized] = rows;
+                }
+                rows.Add(candidate);
             }
 
             foreach (KeyValuePair<string, int> pair in proposedCounts)
@@ -1043,6 +1177,28 @@ namespace VMS.TPS
                 if (pair.Value > 1)
                 {
                     errors.Add("Duplicate New ID in selected rows: " + pair.Key + ".");
+                    foreach (RenameCandidate row in proposedRows[pair.Key])
+                    {
+                        rowErrors[row] = "Duplicate selected New ID.";
+                    }
+                }
+                else if (remainingPatientIds.ContainsKey(pair.Key))
+                {
+                    errors.Add("New ID already exists elsewhere in this patient: " + pair.Key + ".");
+                    foreach (RenameCandidate row in proposedRows[pair.Key])
+                    {
+                        rowErrors[row] = "This ID already exists elsewhere in the patient.";
+                    }
+                }
+            }
+
+            if (updateUi)
+            {
+                foreach (RenameCandidate candidate in _candidates)
+                {
+                    string rowMessage;
+                    rowErrors.TryGetValue(candidate, out rowMessage);
+                    ApplyValidationStyle(candidate, rowMessage);
                 }
             }
 
@@ -1054,6 +1210,78 @@ namespace VMS.TPS
 
             message = string.Empty;
             return true;
+        }
+
+        private void ApplyValidationStyle(RenameCandidate candidate, string rowMessage)
+        {
+            bool hasError = !string.IsNullOrEmpty(rowMessage);
+            if (candidate.NewIdTextBox != null)
+            {
+                candidate.NewIdTextBox.BorderBrush = hasError ? _errorBrush : _defaultTextBoxBorderBrush;
+                candidate.NewIdTextBox.BorderThickness = hasError ? new Thickness(2) : new Thickness(1);
+                candidate.NewIdTextBox.ToolTip = hasError ? rowMessage : null;
+            }
+
+            if (candidate.RowBorder != null)
+            {
+                candidate.RowBorder.BorderBrush = hasError ? _errorBrush : new SolidColorBrush(Color.FromRgb(235, 235, 235));
+                candidate.RowBorder.BorderThickness = hasError ? new Thickness(2) : new Thickness(1, 0, 1, 1);
+            }
+        }
+
+        private static Dictionary<string, int> BuildPatientIdCounts(Patient patient, List<RenameCandidate> candidates)
+        {
+            Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            if (patient != null)
+            {
+                foreach (Study study in patient.Studies.ToList())
+                {
+                    foreach (Series series in study.Series.ToList())
+                    {
+                        foreach (VMS.TPS.Common.Model.API.Image image in series.Images.ToList())
+                        {
+                            AdjustValidationCount(counts, SafeText(image.Id), 1);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                foreach (RenameCandidate candidate in candidates)
+                {
+                    AdjustValidationCount(counts, candidate.CurrentId, 1);
+                }
+            }
+
+            return counts;
+        }
+
+        private static void AdjustValidationCount(Dictionary<string, int> counts, string key, int delta)
+        {
+            string normalized = NormalizeEditedId(key);
+            if (string.IsNullOrEmpty(normalized))
+            {
+                return;
+            }
+
+            int existing;
+            counts.TryGetValue(normalized, out existing);
+            existing = existing + delta;
+
+            if (existing <= 0)
+            {
+                counts.Remove(normalized);
+            }
+            else
+            {
+                counts[normalized] = existing;
+            }
+        }
+
+        private static bool IdsEqual(string left, string right)
+        {
+            return string.Equals(NormalizeEditedId(left), NormalizeEditedId(right), StringComparison.OrdinalIgnoreCase);
         }
 
         private static string NormalizeEditedId(string value)

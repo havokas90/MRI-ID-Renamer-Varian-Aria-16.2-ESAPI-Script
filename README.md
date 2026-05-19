@@ -19,7 +19,10 @@ The script builds proposed image IDs from the existing ARIA study and series des
 - Shows a preview window with MR rows tinted blue and CT rows tinted orange.
 - Lets users untick rows they do not want renamed.
 - Lets users manually edit each proposed **New ID** before clicking Apply.
-- Validates edited IDs for blank values and duplicate selected New IDs before writing.
+- Normalizes edited IDs live and highlights invalid rows before Apply.
+- Validates edited IDs for blank values, duplicate selected New IDs, and IDs already used elsewhere in the patient before writing.
+- Asks for final confirmation before writing changes.
+- Skips unchanged selected rows automatically.
 
 ## Which File To Use
 
@@ -28,6 +31,14 @@ Use this file in Varian Script Wizard / Script Builder:
 `InstallReady/EclipseImageRenamer.cs`
 
 The root `EclipseImageRenamer.cs` is the editable source copy. `InstallReady/EclipseImageRenamer.cs` is kept in sync as the deployment copy.
+
+After editing the root source file, run:
+
+```powershell
+.\Sync-InstallReady.ps1
+```
+
+The local preview and validation builds also check that `InstallReady/EclipseImageRenamer.cs` still matches the root source file.
 
 ## Script Wizard / Script Builder
 
@@ -104,7 +115,7 @@ This script writes to ARIA by setting `image.Id`, so it requires:
 - Script approval for write-enabled use in your environment
 - Local testing on a non-clinical patient or research/test system before clinical deployment
 
-Only selected rows are written. If a user edits a proposed New ID, the script normalizes it to uppercase, replaces spaces with underscores, strips unsupported characters, enforces the 16-character limit, and blocks Apply if selected rows contain duplicate New IDs.
+Only selected rows with changed IDs are written. If a user edits a proposed New ID, the script normalizes it to uppercase, replaces spaces with underscores, strips unsupported characters, enforces the 16-character limit, and blocks Apply if selected rows contain duplicate New IDs or an ID already used elsewhere in the patient.
 
 ## Repository Scope
 

@@ -1,0 +1,5 @@
+<Project>
+  <Target Name="CheckInstallReadySync" BeforeTargets="CoreCompile">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)Sync-InstallReady.ps1&quot; -CheckOnly" />
+  </Target>
+</Project>
