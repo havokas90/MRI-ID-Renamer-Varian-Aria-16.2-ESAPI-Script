@@ -1,41 +1,121 @@
-MRI and CT ID Renamer — Varian Aria 16.2 ESAPI Script
-A write-enabled ESAPI plugin script for Varian Aria 16.2 that automates renaming of imported MRI and CT  image IDs in Eclipse.
-When MRI studies are imported for fusion planning, images arrive with placeholder IDs like 1 or MRI_1. This script reads the existing series description and study description already stored in Aria and generates a meaningful, standardised image ID — without any manual typing.
-What it does:
+# Eclipse Image Renamer - Varian ARIA ESAPI Plugin Script
 
-Scans all MRI and CT series for the currently open patient
-Reads the series description (e.g. t2_tse_ax_p3_2.5mm) and strips slice thickness to save characters
-Reads the study description (e.g. Pelvis Prostate) to automatically append a body region suffix (_PEL, _HN, _CH, _AB, _BR, _SP, _EXT)
-Proposes new IDs within Aria's 16-character limit, truncating at word boundaries
-Shows a preview window with checkboxes — select only the images you want renamed, useful when re-importing into an existing course
-Applies changes with a single click after confirmation
+Write-enabled ESAPI plugin script for Varian ARIA/Eclipse that renames imported MR and CT image IDs from the currently open patient.
 
-Example:
-Before:  1
-After:   T2_TSE_AX_P3_PEL
-Requirements:
+The script builds proposed image IDs from the existing ARIA study and series descriptions, shows a preview table, and only writes changes after the user confirms the selected rows.
 
-Eclipse / Aria 16.2
-Eclipse Scripting API license
-Eclipse Automation license (for write access on clinical systems)
-Visual Studio (to compile as a binary plugin)
+## What It Does
 
-The script is heavily commented throughout and written to be readable by anyone learning ESAPI — each section explains what it does, why, and how to extend it.
+- Scans the open patient for MR and CT series.
+- Uses `study.Comment` and `series.Comment` to build meaningful image IDs.
+- Skips 2D scout/localiser images by requiring `image.ZSize > 1`.
+- Removes slice-thickness fragments such as `_2.5mm`.
+- Handles `ep2d`/DWI descriptions by keeping the meaningful final token where possible.
+- Adds body-site suffixes such as `_PEL`, `_HN`, `_CH`, `_AB`, `_BR`, `_SP`, and `_EXT`.
+- Adds a `CT_` prefix for CT images unless the scanner description already starts with CT.
+- Keeps final IDs within ARIA's 16-character limit.
+- Forces final IDs to uppercase and changes spaces to underscores.
+- Detects existing patient image IDs and auto-numbers duplicate proposals.
+- Shows a preview window with MR rows tinted blue and CT rows tinted orange.
+- Lets users untick rows they do not want renamed.
+- Lets users manually edit each proposed **New ID** before clicking Apply.
+- Validates edited IDs for blank values and duplicate selected New IDs before writing.
 
-Licence & Disclaimer
-© 2025 David Neill. All rights reserved.
-This script is provided for educational and non-commercial use only. It was developed for internal use at [Western Cancer Centre Dubbo and Centeral Western Cancer Center Orange, NSW.] and is shared publicly to support learning within the radiation therapy and medical physics community.
-You are welcome to:
+## Which File To Use
 
-Read, learn from, and adapt this code for your own non-commercial clinical or research use
-Share it with attribution
+Use this file in Varian Script Wizard / Script Builder:
 
-You are not permitted to:
+`InstallReady/EclipseImageRenamer.cs`
 
-Use this script or any derivative of it for commercial purposes
-Sell, license, or redistribute this script as part of a commercial product or service
-Remove or alter this notice
+The root `EclipseImageRenamer.cs` is the editable source copy. `InstallReady/EclipseImageRenamer.cs` is kept in sync as the deployment copy.
 
-Clinical Disclaimer:
-This script is provided as-is, without warranty of any kind. It has been tested in a specific clinical environment and may require modification for use at other sites. The authors of custom scripts are responsible for verifying the accuracy and correctness of their scripts (Varian SYRS350.75). Always test on a non-clinical system before deploying to a clinical environment. The author accepts no liability for any clinical, technical, or data consequences arising from the use of this script.
-This project is not affiliated with, endorsed by, or supported by Varian Medical Systems / Siemens Healthineers.
+## Script Wizard / Script Builder
+
+Create the script as:
+
+- Type: **Plugin**
+- Language: **C#**
+- Write access: **enabled / writeable**
+- Platform: **x64**
+- Framework: **.NET Framework 4.8** or the framework used by your local ARIA/ESAPI install
+
+Do not create this as an **Executable**. This script is intended to run inside Eclipse from the currently open patient.
+
+Keep the assembly attributes in the source file unless your Script Builder project generates a separate `AssemblyInfo.cs`. Do not duplicate the same assembly attributes in both places.
+
+The write-enabled marker must remain:
+
+```csharp
+[assembly: ESAPIScript(IsWriteable = true)]
+```
+
+## Local Preview
+
+This repo includes a small local WPF preview harness so you can inspect the preview window before deploying at work.
+
+Run:
+
+`Launch-LocalPreview.bat`
+
+Local preview mode uses sample MR/CT rows. It does not open an ESAPI patient and cannot write image IDs.
+
+## Varian Script Wizard Launcher
+
+On a machine with Varian RTM 17.0 installed at the standard path, run:
+
+`Launch-ScriptWizard.bat`
+
+This opens:
+
+`InstallReady/EclipseImageRenamer.cs`
+
+with:
+
+`C:\Program Files\Varian\RTM\17.0\esapi\ScriptWizard.exe`
+
+If your Varian install path differs, edit `Launch-ScriptWizard.ps1`.
+
+## Validation Build
+
+The `Validation` project compiles the single-file ESAPI script against local Varian ESAPI DLLs:
+
+- `VMS.TPS.Common.Model.API.dll`
+- `VMS.TPS.Common.Model.Types.dll`
+
+Expected default path:
+
+`C:\Program Files\Varian\RTM\17.0\esapi\API`
+
+Run:
+
+```powershell
+dotnet build .\Validation\EclipseImageRenamer.Validation.csproj -v:minimal
+```
+
+The validation build checks C# compile compatibility against the real local Varian API assemblies. It does not run against a patient.
+
+## Clinical Use Notes
+
+This script writes to ARIA by setting `image.Id`, so it requires:
+
+- Eclipse / ARIA with ESAPI installed
+- Eclipse Scripting API licence
+- Eclipse Automation licence for write access on clinical systems
+- Script approval for write-enabled use in your environment
+- Local testing on a non-clinical patient or research/test system before clinical deployment
+
+Only selected rows are written. If a user edits a proposed New ID, the script normalizes it to uppercase, replaces spaces with underscores, strips unsupported characters, enforces the 16-character limit, and blocks Apply if selected rows contain duplicate New IDs.
+
+## Repository Scope
+
+This repository contains Eclipse Image Renamer only: the plugin script, install-ready copy, local preview harness, validation project, launchers, and setup guide.
+
+## Licence & Disclaimer
+
+Copyright (c) 2026 David Neill.
+
+Provided for educational and non-commercial use. You are responsible for local validation, commissioning, and clinical governance before any clinical deployment.
+
+This script is provided as-is, without warranty of any kind. It was developed for a specific clinical environment and may require modification for other sites. The author accepts no liability for clinical, technical, or data consequences arising from use of this script.
+
+This project is not affiliated with, endorsed by, or supported by Varian Medical Systems or Siemens Healthineers.

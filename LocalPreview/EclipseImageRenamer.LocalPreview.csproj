@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="..\EclipseImageRenamer.cs" Link="EclipseImageRenamer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="VMS.TPS.Common.Model.API">
+      <HintPath>C:\Program Files\Varian\RTM\17.0\esapi\API\VMS.TPS.Common.Model.API.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="VMS.TPS.Common.Model.Types">
+      <HintPath>C:\Program Files\Varian\RTM\17.0\esapi\API\VMS.TPS.Common.Model.Types.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>
